@@ -1,4 +1,4 @@
-/*
+﻿/*
 
 Copyright (c) 2014, 2015, 2016, 2017 Jarryd Beck
 
@@ -1211,8 +1211,6 @@ namespace cxxopts
     : m_program(std::move(program))
     , m_help_string(toLocalString(std::move(help_string)))
     , m_custom_help("[OPTION...]")
-    , m_positional_help("positional parameters")
-    , m_show_positional(false)
     , m_allow_unrecognised(false)
     , m_options(std::make_shared<OptionMap>())
     , m_next_positional(m_positional.end())
@@ -1220,23 +1218,9 @@ namespace cxxopts
     }
 
     Options&
-    positional_help(std::string help_text)
-    {
-      m_positional_help = std::move(help_text);
-      return *this;
-    }
-
-    Options&
     custom_help(std::string help_text)
     {
       m_custom_help = std::move(help_text);
-      return *this;
-    }
-
-    Options&
-    show_positional_help()
-    {
-      m_show_positional = true;
       return *this;
     }
 
@@ -1281,6 +1265,9 @@ namespace cxxopts
     }
 
     std::string
+    usage() const;
+  
+  std::string
     help(const std::vector<std::string>& groups = {}) const;
 
     const std::vector<std::string>
@@ -1314,8 +1301,6 @@ namespace cxxopts
     std::string m_program;
     String m_help_string;
     std::string m_custom_help;
-    std::string m_positional_help;
-    bool m_show_positional;
     bool m_allow_unrecognised;
 
     std::shared_ptr<OptionMap> m_options;
@@ -1692,7 +1677,19 @@ inline
 ParseResult
 Options::parse(int& argc, char**& argv)
 {
+  if (m_options->find("help") == m_options->end())
+  {
+    add_options()("h,help", "");
+  }
   ParseResult result(m_options, m_positional, m_allow_unrecognised, argc, argv);
+  if (result["help"].count() == 0)
+  {
+    for (const auto& arg : m_positional)
+    {
+      if (result[arg].count() == 0)
+        throw cxxopts::option_required_exception(arg);
+    }
+  }
   return result;
 }
 
@@ -1932,14 +1929,16 @@ Options::help_one_group(const std::string& g) const
 
   if (!g.empty())
   {
-    result += toLocalString(" " + g + " options:\n");
+    result += toLocalString("\n" + g + " options:\n");
+  }
+  else
+  {
+    result += toLocalString("\noptions:\n");
   }
 
   for (const auto& o : group->second.options)
   {
-    if (o.is_container &&
-        m_positional_set.find(o.l) != m_positional_set.end() &&
-        !m_show_positional)
+    if (m_positional_set.find(o.l) != m_positional_set.end())
     {
       continue;
     }
@@ -1957,9 +1956,7 @@ Options::help_one_group(const std::string& g) const
   auto fiter = format.begin();
   for (const auto& o : group->second.options)
   {
-    if (o.is_container &&
-        m_positional_set.find(o.l) != m_positional_set.end() &&
-        !m_show_positional)
+    if (m_positional_set.find(o.l) != m_positional_set.end())
     {
       continue;
     }
@@ -2003,10 +2000,6 @@ Options::generate_group_help
       continue;
     }
     result += group_help_text;
-    if (i < print_groups.size() - 1)
-    {
-      result += '\n';
-    }
   }
 }
 
@@ -2027,16 +2020,86 @@ Options::generate_all_groups_help(String& result) const
 
 inline
 std::string
-Options::help(const std::vector<std::string>& help_groups) const
+Options::usage() const
 {
-  String result = m_help_string + "\nUsage:\n  " +
+  String result;
+  if (m_help_string != "")
+  {
+    result += m_help_string + "\n";
+  }
+  result += "usage:\n  " +
     toLocalString(m_program) + " " + toLocalString(m_custom_help);
 
-  if (m_positional.size() > 0 && m_positional_help.size() > 0) {
-    result += " " + toLocalString(m_positional_help);
+  for (const auto& arg : m_positional)
+  {
+    result += " " + arg;
   }
+  return result;
+}
 
-  result += "\n\n";
+inline
+std::string
+Options::help(const std::vector<std::string>& help_groups) const
+{
+  String result = usage();
+
+  result += "\n";
+
+  if (m_positional.size() > 0)
+  {
+    typedef std::vector<std::pair<String, String>> OptionHelp;
+    auto group = m_help.find("");
+    OptionHelp format;
+
+    size_t longest = 0;
+
+    result += toLocalString("\npositional arguments\n");
+
+    for (const auto& o : group->second.options)
+    {
+      if (m_positional_set.find(o.l) == m_positional_set.end())
+      {
+        continue;
+      }
+
+      auto s = "  " + toLocalString(o.l);
+      longest = (std::max)(longest, stringLength(s));
+      format.push_back(std::make_pair(s, String()));
+    }
+
+    longest = (std::min)(longest, static_cast<size_t>(OPTION_LONGEST));
+
+    //widest allowed description
+    auto allowed = size_t{ 76 } -longest - OPTION_DESC_GAP;
+
+    auto fiter = format.begin();
+    for (const auto& o : group->second.options)
+    {
+      if (m_positional_set.find(o.l) == m_positional_set.end())
+      {
+        continue;
+      }
+
+      auto d = format_description(o, longest + OPTION_DESC_GAP, allowed);
+
+      result += fiter->first;
+      if (stringLength(fiter->first) > longest)
+      {
+        result += '\n';
+        result += toLocalString(std::string(longest + OPTION_DESC_GAP, ' '));
+      }
+      else
+      {
+        result += toLocalString(std::string(longest + OPTION_DESC_GAP -
+          stringLength(fiter->first),
+          ' '));
+      }
+      result += d;
+      result += '\n';
+
+      ++fiter;
+    }
+  }
 
   if (help_groups.size() == 0)
   {
@@ -2047,6 +2110,7 @@ Options::help(const std::vector<std::string>& help_groups) const
     generate_group_help(result, help_groups);
   }
 
+  result.pop_back();
   return toUTF8String(result);
 }
 
