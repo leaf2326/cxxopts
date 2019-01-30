@@ -2053,7 +2053,7 @@ Options::help(const std::vector<std::string>& help_groups) const
 
     size_t longest = 0;
 
-    result += toLocalString("\npositional arguments\n");
+    result += toLocalString("\npositional arguments:\n");
 
     for (const auto& o : group->second.options)
     {
