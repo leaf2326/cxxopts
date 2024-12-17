@@ -1,5 +1,9 @@
 [![Build Status](https://travis-ci.org/jarro2783/cxxopts.svg?branch=master)](https://travis-ci.org/jarro2783/cxxopts)
 
+# About
+
+This repository is forked from [cxxopts](https://github.com/TadaoYamaoka/cxxopts), edited cxxopts.hpp for C++20.
+
 # Release versions
 
 Note that `master` is generally a work in progress, and you probably want to use a
