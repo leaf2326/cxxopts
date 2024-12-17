@@ -2,7 +2,7 @@
 
 # About
 
-This repository is forked from [cxxopts](https://github.com/TadaoYamaoka/cxxopts), edited cxxopts.hpp for C++20.
+This repository is forked from Tadao Yamaoka's forked [cxxopts](https://github.com/TadaoYamaoka/cxxopts), edited cxxopts.hpp for C++20.
 
 # Release versions
 
